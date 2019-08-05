@@ -1,3 +1,16 @@
+# raw data directories
+raw_data/*
+!raw_data/.keep
+
+# temporary data directories
+temp_data/*
+!temp_data/.keep
+
+# prepared data directories
+prep_data/*
+!prep_data/.keep
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
