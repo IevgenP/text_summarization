@@ -1,3 +1,12 @@
 import os
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+VOCAB_SIZE = 120000
+TEXT_LEN = 300 #1500
+SUMMARY_LEN = 30 #100
+BATCH_SIZE = 70
+EMBEDDING_DIM = 200
+LSTM_HIDDEN_UNITS = 128
+DROPOUT = 0.2
+EPOCHS = 50
+ATT_U = 64
