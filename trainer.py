@@ -2,7 +2,7 @@ import pickle
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from src.nn.encoder_decoder import MainModel
-from def_text_summ import ROOT_DIR, VOCAB_SIZE, TEXT_LEN, SUMMARY_LEN, BATCH_SIZE, EPOCHS, EMBEDDING_DIM, ATT_U
+from def_text_summ import ROOT_DIR, VOCAB_SIZE, TEXT_LEN, SUMMARY_LEN, BATCH_SIZE, EPOCHS, EMBEDDING_DIM, ATT_U, GRU_HIDDEN_UNITS
 from src.nn.encoder_decoder import BahdanauAttention, EncoderOnly, InferenceDecoder
 from src.inferencer.inferencer import decode_sequence, sequence_to_summary, sequence_to_text
 
@@ -50,6 +50,7 @@ if __name__ == '__main__':
         enc_vocab_size=enc_vocab_size,
         dec_vocab_size=dec_vocab_size,
         embedded_dimension=EMBEDDING_DIM,
+        gru_hidden_units=GRU_HIDDEN_UNITS, 
         attention_units=ATT_U
     )
 
@@ -79,7 +80,7 @@ if __name__ == '__main__':
     )
 
     # save model
-    model.save(ROOT_DIR + '/pickled/simple_enc_dec_att.h5')
+    model.save(ROOT_DIR + '/pickled/simple_enc_dec_att_gru.h5')
 
     # plot history for loss and accuracy
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -91,4 +92,4 @@ if __name__ == '__main__':
     ax.set_xlabel('Epoch')
     ax.legend(['train', 'test'], loc='upper left')
 
-    fig.savefig(ROOT_DIR + '/train_val_loss_charts/train_val_loss.png')
+    fig.savefig(ROOT_DIR + '/train_val_loss_charts/train_val_loss_gru.png')

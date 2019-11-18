@@ -93,7 +93,7 @@ def MainModel(text_max_len=1500,
                enc_vocab_size=20000,
                dec_vocab_size=20000,
                embedded_dimension=128,
-               lstm_hidden_units=128,
+               gru_hidden_units=128,
                attention_units=100):
 
     # ENCODER -----------------------------------------------------------------------------------------------------------#
@@ -108,55 +108,55 @@ def MainModel(text_max_len=1500,
         output_dim=embedded_dimension,
         input_length=text_max_len,
         name='encoder_embeddings',
-        mask_zero=True
+        mask_zero=False
     )(enc_input)
     
-    enc_lstm, enc_state_h_forward, enc_state_c_forward, enc_state_h_backward, enc_state_c_backward = tf.keras.layers.Bidirectional(
-        tf.keras.layers.LSTM(
-            units=lstm_hidden_units, 
+    enc_gru, enc_state_h_forward, enc_state_h_backward = tf.keras.layers.Bidirectional(
+        tf.keras.layers.GRU(
+            units=gru_hidden_units, 
             return_sequences=True,
             return_state=True,
             dropout=0.2,
             recurrent_dropout=0.2,
-            name='encoder_lstm'
+            name='encoder_gru'
         ),
         merge_mode='sum',
-        name='encoder_bidirectional_lstm'
+        name='encoder_bidirectional_gru'
     )(enc_embedded_sequence)
 
     enc_state_h = tf.keras.layers.Add(name='encoder_hidden_state_addition')([enc_state_h_forward, enc_state_h_backward])
-    enc_state_c = tf.keras.layers.Add(name='encoder_cell_state_addition')([enc_state_c_forward, enc_state_c_backward])
 
     # DECODER -----------------------------------------------------------------------------------------------------------#
     dec_input = tf.keras.layers.Input(
         shape=(None,), 
         name='decoder_input'
     )
+
     dec_embedded_sequence = tf.keras.layers.Embedding(
         input_dim=dec_vocab_size,
         output_dim=embedded_dimension,
         input_length=summary_max_len,
         name='decoder_embeddings',
-        mask_zero=True
+        mask_zero=False
     )(dec_input)
 
-    dec_lstm, dec_state_h, dec_state_c = tf.keras.layers.LSTM(
-        units=lstm_hidden_units, 
+    dec_gru, dec_state_h = tf.keras.layers.GRU(
+        units=gru_hidden_units, 
         return_sequences=True,
         return_state=True,
         dropout=0.2,
         recurrent_dropout=0.2,
-        name='decoder_lstm'
-    )(dec_embedded_sequence, initial_state=[enc_state_h, enc_state_c])
+        name='decoder_gru'
+    )(dec_embedded_sequence, initial_state=[enc_gru[:, -1, :]])
 
     # Attention layer in Decoder
     context_vec = BahdanauAttention(
         units=attention_units, 
         name='bahdanau_attention'
-    )([dec_lstm, enc_lstm])
+    )([dec_gru, enc_gru])
 
     # Concatenation of context vector with decoder output
-    dec_concat = tf.keras.layers.Concatenate(name='concat_hid_layer_context_vec')([dec_lstm, context_vec])
+    dec_concat = tf.keras.layers.Concatenate(name='concat_hid_layer_context_vec')([dec_gru, context_vec])
 
     # Dense layer of Decoder
     dec_output = tf.keras.layers.TimeDistributed(
@@ -166,7 +166,7 @@ def MainModel(text_max_len=1500,
             name='decoder_dense'
         ),
         name='time_distributed_dense'
-    )(dec_concat) #(dec_lstm)
+    )(dec_concat)
 
     # DEFINING MAIN MODEL ------------------------------------------------------------------------------------------------#
     model = tf.keras.models.Model([enc_input, dec_input], dec_output)
@@ -178,9 +178,8 @@ def EncoderOnly(trained_enc_dec_model):
     return tf.keras.models.Model(
         inputs=trained_enc_dec_model.get_layer('encoder_input').input,
         outputs=[
-            trained_enc_dec_model.get_layer('encoder_bidirectional_lstm').output[0],
-            trained_enc_dec_model.get_layer('encoder_hidden_state_addition').output, 
-            trained_enc_dec_model.get_layer('encoder_cell_state_addition').output
+            trained_enc_dec_model.get_layer('encoder_bidirectional_gru').output[0],
+            trained_enc_dec_model.get_layer('encoder_hidden_state_addition').output
         ]
     )
 
@@ -190,7 +189,7 @@ def InferenceDecoder(trained_enc_dec_model,
                      summary_max_len=100,
                      dec_vocab_size=20000,
                      embedded_dimension=128,
-                     lstm_hidden_units=128,
+                     gru_hidden_units=128,
                      attention_units=100):
 
     # Decoder setup
@@ -198,36 +197,34 @@ def InferenceDecoder(trained_enc_dec_model,
 
     # Below tensors will hold the states of the previous time step
     inf_decoder_hidden_states_input = tf.keras.layers.Input(
-        shape=(text_max_len, lstm_hidden_units),
+        shape=(text_max_len, gru_hidden_units),
         name='inf_input_1'
     )
     inf_decoder_state_input_h = tf.keras.layers.Input(
-        shape=(lstm_hidden_units,), 
+        shape=(gru_hidden_units,), 
         name='inf_input_2'
     )
-    inf_decoder_state_input_c = tf.keras.layers.Input(
-        shape=(lstm_hidden_units,), 
-        name='inf_input_3'
-    )
-
     
     # load embedding layer
     inf_dec_emb = trained_enc_dec_model.get_layer('decoder_embeddings').output
 
-    # load weights of decoder lstm layer from trained model
-    inf_lstm_layer = trained_enc_dec_model.get_layer('decoder_lstm')    
-    inf_dec_lstm, inf_state_h, inf_state_c = inf_lstm_layer(
+    # load weights of decoder gru layer from trained model
+    inf_gru_layer = trained_enc_dec_model.get_layer('decoder_gru')    
+    inf_dec_gru, inf_state_h = inf_gru_layer(
         inf_dec_emb, 
-        initial_state=[inf_decoder_state_input_h, inf_decoder_state_input_c],
+        initial_state=[inf_decoder_state_input_h],
         training=False
     )
 
     # load weights and configuration of decoder attention layer from trained model
     inf_attention_layer = trained_enc_dec_model.get_layer('bahdanau_attention')
-    inf_context_vec = inf_attention_layer([inf_dec_lstm, inf_decoder_hidden_states_input], training=False)
+    inf_context_vec = inf_attention_layer(
+        [inf_dec_gru, inf_decoder_hidden_states_input],
+        training=False
+    )
 
     # Concatenation of context vector with decoder output
-    inf_dec_concat = tf.keras.layers.Concatenate()([inf_dec_lstm, inf_context_vec])
+    inf_dec_concat = tf.keras.layers.Concatenate()([inf_dec_gru, inf_context_vec])
 
     # A dense softmax layer to generate prob dist. over the target vocabulary
     inf_dense_layer = trained_enc_dec_model.get_layer('time_distributed_dense') # time_distributed_dense
@@ -235,8 +232,8 @@ def InferenceDecoder(trained_enc_dec_model,
 
     # Final decoder model
     inference_decoder = tf.keras.models.Model(
-        [inf_dec_input] + [inf_decoder_hidden_states_input, inf_decoder_state_input_h, inf_decoder_state_input_c],
-        [inf_dec_output] + [inf_state_h, inf_state_c])
+        [inf_dec_input] + [inf_decoder_hidden_states_input, inf_decoder_state_input_h],
+        [inf_dec_output] + [inf_state_h])
 
     return inference_decoder
 
