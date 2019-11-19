@@ -94,7 +94,8 @@ def MainModel(text_max_len=1500,
                dec_vocab_size=20000,
                embedded_dimension=128,
                lstm_hidden_units=128,
-               attention_units=100):
+               attention_units=100,
+               dropout=None):
 
     # ENCODER -----------------------------------------------------------------------------------------------------------#
     enc_input = tf.keras.layers.Input(
@@ -116,8 +117,8 @@ def MainModel(text_max_len=1500,
             units=lstm_hidden_units, 
             return_sequences=True,
             return_state=True,
-            dropout=0.2,
-            recurrent_dropout=0.2,
+            dropout=dropout,
+            recurrent_dropout=dropout,
             name='encoder_lstm'
         ),
         merge_mode='ave',
@@ -144,8 +145,8 @@ def MainModel(text_max_len=1500,
         units=lstm_hidden_units, 
         return_sequences=True,
         return_state=True,
-        dropout=0.2,
-        recurrent_dropout=0.2,
+        dropout=dropout,
+        recurrent_dropout=dropout,
         name='decoder_lstm'
     )(dec_embedded_sequence, initial_state=[enc_state_h, enc_state_c])
 
@@ -187,11 +188,7 @@ def EncoderOnly(trained_enc_dec_model):
 
 def InferenceDecoder(trained_enc_dec_model,
                      text_max_len=1500,
-                     summary_max_len=100,
-                     dec_vocab_size=20000,
-                     embedded_dimension=128,
-                     lstm_hidden_units=128,
-                     attention_units=100):
+                     lstm_hidden_units=128):
 
     # Decoder setup
     inf_dec_input = trained_enc_dec_model.get_layer('decoder_input').input

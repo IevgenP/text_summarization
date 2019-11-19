@@ -2,7 +2,7 @@ import pickle
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from src.nn.encoder_decoder import MainModel
-from def_text_summ import ROOT_DIR, VOCAB_SIZE, TEXT_LEN, SUMMARY_LEN, BATCH_SIZE, EPOCHS, EMBEDDING_DIM, ATT_U
+from def_text_summ import ROOT_DIR, VOCAB_SIZE, TEXT_LEN, SUMMARY_LEN, BATCH_SIZE, EPOCHS, EMBEDDING_DIM, ATT_U, DROPOUT
 from src.nn.encoder_decoder import BahdanauAttention, EncoderOnly, InferenceDecoder
 from src.inferencer.inferencer import decode_sequence, sequence_to_summary, sequence_to_text
 
@@ -50,7 +50,8 @@ if __name__ == '__main__':
         enc_vocab_size=enc_vocab_size,
         dec_vocab_size=dec_vocab_size,
         embedded_dimension=EMBEDDING_DIM,
-        attention_units=ATT_U
+        attention_units=ATT_U,
+        dropout=DROPOUT
     )
 
     # COMPILE THE MODEL
