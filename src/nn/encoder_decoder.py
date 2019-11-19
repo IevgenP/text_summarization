@@ -111,8 +111,21 @@ def MainModel(text_max_len=1500,
         name='encoder_embeddings',
         mask_zero=True
     )(enc_input)
+
+    enc_lstm_0, enc_state_h_forward_0, enc_state_c_forward_0, enc_state_h_backward_0, enc_state_c_backward_0 = tf.keras.layers.Bidirectional(
+        tf.keras.layers.LSTM(
+            units=lstm_hidden_units, 
+            return_sequences=True,
+            return_state=True,
+            dropout=dropout,
+            recurrent_dropout=dropout,
+            name='encoder_lstm_0'
+        ),
+        merge_mode='ave',
+        name='encoder_bidirectional_lstm_0'
+    )(enc_embedded_sequence)
     
-    enc_lstm, enc_state_h_forward, enc_state_c_forward, enc_state_h_backward, enc_state_c_backward = tf.keras.layers.Bidirectional(
+    enc_lstm, enc_state_h_forward_1, enc_state_c_forward_1, enc_state_h_backward_1, enc_state_c_backward_1 = tf.keras.layers.Bidirectional(
         tf.keras.layers.LSTM(
             units=lstm_hidden_units, 
             return_sequences=True,
@@ -123,10 +136,14 @@ def MainModel(text_max_len=1500,
         ),
         merge_mode='ave',
         name='encoder_bidirectional_lstm'
-    )(enc_embedded_sequence)
+    )(enc_lstm_0)
 
-    enc_state_h = tf.keras.layers.Average(name='encoder_hidden_state_avg')([enc_state_h_forward, enc_state_h_backward])
-    enc_state_c = tf.keras.layers.Average(name='encoder_cell_state_avg')([enc_state_c_forward, enc_state_c_backward])
+    enc_state_h = tf.keras.layers.Average(name='encoder_hidden_state_avg')(
+        [enc_state_h_forward_0, enc_state_h_backward_0, enc_state_h_forward_1, enc_state_h_backward_1]
+    )
+    enc_state_c = tf.keras.layers.Average(name='encoder_cell_state_avg')(
+        [enc_state_c_forward_0, enc_state_c_backward_0, enc_state_c_forward_1, enc_state_c_backward_1]
+    )
 
     # DECODER -----------------------------------------------------------------------------------------------------------#
     dec_input = tf.keras.layers.Input(
