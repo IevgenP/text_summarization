@@ -120,12 +120,12 @@ def MainModel(text_max_len=1500,
             recurrent_dropout=0.2,
             name='encoder_lstm'
         ),
-        merge_mode='sum',
+        merge_mode='ave',
         name='encoder_bidirectional_lstm'
     )(enc_embedded_sequence)
 
-    enc_state_h = tf.keras.layers.Add(name='encoder_hidden_state_addition')([enc_state_h_forward, enc_state_h_backward])
-    enc_state_c = tf.keras.layers.Add(name='encoder_cell_state_addition')([enc_state_c_forward, enc_state_c_backward])
+    enc_state_h = tf.keras.layers.Average(name='encoder_hidden_state_avg')([enc_state_h_forward, enc_state_h_backward])
+    enc_state_c = tf.keras.layers.Average(name='encoder_cell_state_avg')([enc_state_c_forward, enc_state_c_backward])
 
     # DECODER -----------------------------------------------------------------------------------------------------------#
     dec_input = tf.keras.layers.Input(
@@ -179,8 +179,8 @@ def EncoderOnly(trained_enc_dec_model):
         inputs=trained_enc_dec_model.get_layer('encoder_input').input,
         outputs=[
             trained_enc_dec_model.get_layer('encoder_bidirectional_lstm').output[0],
-            trained_enc_dec_model.get_layer('encoder_hidden_state_addition').output, 
-            trained_enc_dec_model.get_layer('encoder_cell_state_addition').output
+            trained_enc_dec_model.get_layer('encoder_hidden_state_avg').output, 
+            trained_enc_dec_model.get_layer('encoder_cell_state_avg').output
         ]
     )
 
