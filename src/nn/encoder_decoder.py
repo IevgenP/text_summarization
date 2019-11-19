@@ -120,12 +120,12 @@ def MainModel(text_max_len=1500,
             recurrent_dropout=0.2,
             name='encoder_lstm'
         ),
-        merge_mode='ave',
+        merge_mode='concat',
         name='encoder_bidirectional_lstm'
     )(enc_embedded_sequence)
 
-    enc_state_h = tf.keras.layers.Average(name='encoder_hidden_state_avg')([enc_state_h_forward, enc_state_h_backward])
-    enc_state_c = tf.keras.layers.Average(name='encoder_cell_state_avg')([enc_state_c_forward, enc_state_c_backward])
+    enc_state_h = tf.keras.layers.Concatenate(name='encoder_hidden_state_concat')([enc_state_h_forward, enc_state_h_backward])
+    enc_state_c = tf.keras.layers.Concatenate(name='encoder_cell_state_concat')([enc_state_c_forward, enc_state_c_backward])
 
     # DECODER -----------------------------------------------------------------------------------------------------------#
     dec_input = tf.keras.layers.Input(
@@ -141,7 +141,7 @@ def MainModel(text_max_len=1500,
     )(dec_input)
 
     dec_lstm, dec_state_h, dec_state_c = tf.keras.layers.LSTM(
-        units=lstm_hidden_units, 
+        units=lstm_hidden_units*2, 
         return_sequences=True,
         return_state=True,
         dropout=0.2,
@@ -179,8 +179,8 @@ def EncoderOnly(trained_enc_dec_model):
         inputs=trained_enc_dec_model.get_layer('encoder_input').input,
         outputs=[
             trained_enc_dec_model.get_layer('encoder_bidirectional_lstm').output[0],
-            trained_enc_dec_model.get_layer('encoder_hidden_state_avg').output, 
-            trained_enc_dec_model.get_layer('encoder_cell_state_avg').output
+            trained_enc_dec_model.get_layer('encoder_hidden_state_concat').output, 
+            trained_enc_dec_model.get_layer('encoder_cell_state_concat').output
         ]
     )
 
@@ -198,15 +198,15 @@ def InferenceDecoder(trained_enc_dec_model,
 
     # Below tensors will hold the states of the previous time step
     inf_decoder_hidden_states_input = tf.keras.layers.Input(
-        shape=(text_max_len, lstm_hidden_units),
+        shape=(text_max_len, lstm_hidden_units*2),
         name='inf_input_1'
     )
     inf_decoder_state_input_h = tf.keras.layers.Input(
-        shape=(lstm_hidden_units,), 
+        shape=(lstm_hidden_units*2,), 
         name='inf_input_2'
     )
     inf_decoder_state_input_c = tf.keras.layers.Input(
-        shape=(lstm_hidden_units,), 
+        shape=(lstm_hidden_units*2,), 
         name='inf_input_3'
     )
 
