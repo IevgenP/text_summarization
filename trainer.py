@@ -80,7 +80,7 @@ if __name__ == '__main__':
     )
 
     # save model
-    model.save(ROOT_DIR + '/pickled/enc_dec_att_avg_2_lstm_all_hl.h5')
+    model.save(ROOT_DIR + '/pickled/enc_dec_att_avg_2_lstm_last_hl.h5')
 
     # plot history for loss and accuracy
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -92,4 +92,4 @@ if __name__ == '__main__':
     ax.set_xlabel('Epoch')
     ax.legend(['train', 'test'], loc='upper left')
 
-    fig.savefig(ROOT_DIR + '/train_val_loss_charts/train_val_loss_avg_2_lstm_all_hl.png')
+    fig.savefig(ROOT_DIR + '/train_val_loss_charts/train_val_loss_avg_2_lstm_last_hl.png')

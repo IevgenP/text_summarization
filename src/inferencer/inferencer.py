@@ -21,7 +21,6 @@ def decode_sequence(input_sequence, encoder, decoder_model, word_index, reverse_
     decoded_sentence = ''
     
     # loop through decoder untill max length is reached or stop word is predicted
-    print('started while loop...')
     while not stop_condition:
         output_tokens, h, c = decoder_model.predict([target_seq] + [enc_output, input_hidden_state, input_cell_state])
         
@@ -41,7 +40,6 @@ def decode_sequence(input_sequence, encoder, decoder_model, word_index, reverse_
         # Update internal states
         input_hidden_state, input_cell_state = h, c
 
-    print('sequence decoding is done.')
     return decoded_sentence
 
 

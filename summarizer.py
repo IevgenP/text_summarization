@@ -34,7 +34,7 @@ with open(ROOT_DIR + '/prep_data/tokenized/train_labels_tokenized', 'rb') as fil
 
 # load pre-trained model
 trained_model = tf.keras.models.load_model(
-    ROOT_DIR + '/pickled/enc_dec_att_avg_2_lstm_all_hl.h5',
+    ROOT_DIR + '/pickled/enc_dec_att_avg_2_lstm_last_hl.h5',
     custom_objects={'BahdanauAttention': BahdanauAttention}
 )
 trained_model.summary()
