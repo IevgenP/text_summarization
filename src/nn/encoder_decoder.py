@@ -1,4 +1,5 @@
 import tensorflow as tf
+import numpy as np
 
 class BahdanauAttention(tf.keras.layers.Layer):
     
@@ -21,13 +22,16 @@ class BahdanauAttention(tf.keras.layers.Layer):
         assert isinstance(inputs, list)
         decoder_output = inputs[0]
         encoder_output = inputs[1]
+        print("encoder_output shape: ", encoder_output.shape)
 
-        def calculate_context_vec(step_inputs, states):
+        def get_attention_weights(inputs, states):
 
+            #print('#'*15)
             # hidden shape == (batch_size, hidden size)
             # hidden_with_time_axis shape == (batch_size, 1, hidden size)
             # we are doing this to perform addition to calculate the score
-            hidden_with_time_axis = tf.expand_dims(step_inputs, 1)
+            #print("Shape of inputs into get_att... function: ", inputs.shape)
+            hidden_with_time_axis = tf.expand_dims(inputs, 1)
 
             # score shape == (batch_size, max_length, 1)
             # we get 1 at the last axis because we are applying score to self.V
@@ -44,12 +48,28 @@ class BahdanauAttention(tf.keras.layers.Layer):
                 )
             )
 
-            # attention_weights shape == (batch_size, max_length, 1)
-            step_attention_weights = tf.nn.softmax(score, axis=1)
+            #print("Shape of score: ", score.shape)
+            score = tf.keras.backend.reshape(score, (-1, encoder_output.shape[1])) # batch_size, en_seq_len
+            #print("Shape of score: ", score.shape)
 
-            # step context_vector shape after sum == (batch_size, hidden_size)
-            step_context_vector = step_attention_weights * encoder_output
+            # EXCLUDE attention_weights shape == (batch_size, max_length, 1)
+            step_attention_weights = tf.nn.softmax(score, axis=1)
+            #print("Shape of step_attention_weights: ", step_attention_weights.shape)
+
+            return step_attention_weights, [step_attention_weights]
+
+        
+        def calculate_context_vec(inputs, states):
+
+            # step context_vector shape after 
+            # sum == (batch_size, hidden_size)
+            #print("Shape of encoder output: ", encoder_output.shape)
+            attentiont_weights_time_axis = tf.expand_dims(inputs, -1)
+            #print("Shape of attentiont_weights_time_axis: ", attentiont_weights_time_axis.shape)
+            step_context_vector = attentiont_weights_time_axis * encoder_output
+            #print("Shape of multiplication step_att_weights * enc_output: ", step_context_vector.shape)
             step_context_vector = tf.reduce_sum(step_context_vector, axis=1)
+            #print("Shape of multiplication step_att_weights * enc_output after sum reduce: ", step_context_vector.shape)
             return step_context_vector, [step_context_vector]
 
 
@@ -62,10 +82,17 @@ class BahdanauAttention(tf.keras.layers.Layer):
             fake_state = tf.keras.backend.tile(fake_state, [1, hidden_size])  # <= (batch_size, latent_dim)
             return fake_state
 
-        fake_state = create_inital_state(encoder_output, encoder_output.shape[-1])
-        _, context_vector, _ = tf.keras.backend.rnn(calculate_context_vec, decoder_output, [fake_state])
+        # make fake states for rnn funiction
+        fake_state_att = create_inital_state(encoder_output, encoder_output.shape[1])
+        #print("Shape of fake_state_att: ", fake_state_att.shape)
+        fake_state_context = create_inital_state(encoder_output, encoder_output.shape[-1])
+        #print("Shape of fake_state_context: ", fake_state_context.shape)
+        
+        _, attention_weights, _ = tf.keras.backend.rnn(get_attention_weights, decoder_output, [fake_state_att])
+        #print("PASSED FIRST STAGE")
+        _, context_vector, _ = tf.keras.backend.rnn(calculate_context_vec, attention_weights, [fake_state_context])
 
-        return context_vector
+        return context_vector, attention_weights
 
     def compute_output_shape(self, input_shape):
         assert isinstance(input_shape, list)
@@ -86,6 +113,9 @@ class BahdanauAttention(tf.keras.layers.Layer):
         base_config = super(BahdanauAttention, self).get_config()
         config.update(base_config)
         return config
+
+
+
 
 
 def MainModel(text_max_len=1500,
@@ -168,12 +198,13 @@ def MainModel(text_max_len=1500,
     )(dec_embedded_sequence, initial_state=[enc_state_h, enc_state_c])
 
     # Attention layer in Decoder
-    context_vec = BahdanauAttention(
+    context_vec, att_vector = BahdanauAttention(
         units=attention_units, 
         name='bahdanau_attention'
     )([dec_lstm, enc_lstm])
 
     # Concatenation of context vector with decoder output
+    print("Shape of dec_lstm: ", dec_lstm.shape)
     dec_concat = tf.keras.layers.Concatenate(name='concat_hid_layer_context_vec')([dec_lstm, context_vec])
 
     # Dense layer of Decoder
@@ -185,6 +216,26 @@ def MainModel(text_max_len=1500,
         ),
         name='time_distributed_dense'
     )(dec_concat) #(dec_lstm)
+
+    # ### POINTER-GENERATOR [TO BE PRESENTED AS A LAYER]
+    print("Shape of context_vec", context_vec.shape)
+    print("Shape of att_vector", att_vector.shape)
+    print("Shape of dec_state_h", dec_state_h)
+    print("Shape of dec_embedded_sequence", dec_embedded_sequence)
+    print("Shape of dec_output", dec_output)
+
+    # Point-generator
+    dense_context_vec = tf.keras.layers.Dense(units=)
+
+
+    # p_gen = (
+    #     W_h.T*context_vec +                 # Shape of context_vec (None, None, 128)
+    #     W_s.T*dec_state_h +                 # Shape of dec_state_h Tensor("decoder_lstm/Identity_1:0", shape=(None, 128), dtype=float32)
+    #     W_x.T*dec_embedded_sequence +       # Shape of dec_embedded_sequence Tensor("decoder_embeddings/Identity:0", shape=(None, None, 200), dtype=float32)
+    #     b
+    # )
+
+    #  p_w = p_gen*p_vocab_w + (1-p_gen)*SUM(att_vec)  # Shape of dec_output Tensor("time_distributed_dense/Identity:0", shape=(None, None, 120002), dtype=float32)
 
     # DEFINING MAIN MODEL ------------------------------------------------------------------------------------------------#
     model = tf.keras.models.Model([enc_input, dec_input], dec_output)
