@@ -22,7 +22,6 @@ class BahdanauAttention(tf.keras.layers.Layer):
         assert isinstance(inputs, list)
         decoder_output = inputs[0]
         encoder_output = inputs[1]
-        print("encoder_output shape: ", encoder_output.shape)
 
         def get_attention_weights(inputs, states):
 
@@ -121,7 +120,6 @@ class BahdanauAttention(tf.keras.layers.Layer):
 def MainModel(text_max_len=1500,
                summary_max_len=100,
                enc_vocab_size=20000,
-               dec_vocab_size=20000,
                embedded_dimension=128,
                lstm_hidden_units=128,
                attention_units=100,
@@ -134,13 +132,15 @@ def MainModel(text_max_len=1500,
         name='encoder_input'
     )
     
-    enc_embedded_sequence = tf.keras.layers.Embedding(
+    emb = tf.keras.layers.Embedding(
         input_dim=enc_vocab_size,
         output_dim=embedded_dimension,
         input_length=text_max_len,
         name='encoder_embeddings',
         mask_zero=True
-    )(enc_input)
+    )
+
+    enc_embedded_sequence = emb(enc_input)
 
     enc_lstm_0, enc_state_h_forward_0, enc_state_c_forward_0, enc_state_h_backward_0, enc_state_c_backward_0 = tf.keras.layers.Bidirectional(
         tf.keras.layers.LSTM(
@@ -180,13 +180,7 @@ def MainModel(text_max_len=1500,
         shape=(None,), 
         name='decoder_input'
     )
-    dec_embedded_sequence = tf.keras.layers.Embedding(
-        input_dim=dec_vocab_size,
-        output_dim=embedded_dimension,
-        input_length=summary_max_len,
-        name='decoder_embeddings',
-        mask_zero=True
-    )(dec_input)
+    dec_embedded_sequence = emb(dec_input)
 
     dec_lstm, dec_state_h, dec_state_c = tf.keras.layers.LSTM(
         units=lstm_hidden_units, 
@@ -204,13 +198,13 @@ def MainModel(text_max_len=1500,
     )([dec_lstm, enc_lstm])
 
     # Concatenation of context vector with decoder output
-    print("Shape of dec_lstm: ", dec_lstm.shape)
+    # print("Shape of dec_lstm: ", dec_lstm.shape)
     dec_concat = tf.keras.layers.Concatenate(name='concat_hid_layer_context_vec')([dec_lstm, context_vec])
 
     # Dense layer of Decoder
-    dec_output = tf.keras.layers.TimeDistributed(
+    p_vocab_w = tf.keras.layers.TimeDistributed(
         tf.keras.layers.Dense(
-            dec_vocab_size, 
+            enc_vocab_size, 
             activation='softmax',
             name='decoder_dense'
         ),
@@ -218,17 +212,61 @@ def MainModel(text_max_len=1500,
     )(dec_concat) #(dec_lstm)
 
     # ### POINTER-GENERATOR [TO BE PRESENTED AS A LAYER]
-    print("Shape of context_vec", context_vec.shape)
-    print("Shape of att_vector", att_vector.shape)
-    print("Shape of dec_state_h", dec_state_h)
-    print("Shape of dec_embedded_sequence", dec_embedded_sequence)
-    print("Shape of dec_output", dec_output)
+    # print("Shape of context_vec", context_vec.shape)
+    # print("Shape of att_vector", att_vector.shape)
+    # print("Shape of dec_state_h", dec_state_h)
+    # print("Shape of dec_embedded_sequence", dec_embedded_sequence)
+    # print("Shape of p_vocab_w", p_vocab_w)
 
-    # Point-generator
-    dense_context_vec = tf.keras.layers.Dense(units=)
+    # initial text reshaped to (batch_size, text_max_len, text_vocab)
+    # init_text_for_pointer = tf.keras.layers.Input(
+    #     shape=(enc_vocab_size, text_max_len, ),
+    #     dtype='int32', 
+    #     name='init_text_for_pointer'
+    # )
+    # print("Shape of init_text_for_pointer", init_text_for_pointer.shape)
+
+    # Point-generator inputs
+    dense_context_vec = tf.keras.layers.Dense(1, name='d_con_vec')(context_vec)
+    # print("Shape of dense_context_vec: ", dense_context_vec.shape)
+    dense_dec_lstm = tf.keras.layers.Dense(1, name='d_dec_state_h')(dec_lstm)
+    # print("Shape of dense_dec_state: ", dense_dec_lstm.shape)
+    dense_dec_inputs = tf.keras.layers.Dense(1, name='d_dec_inputs')(dec_embedded_sequence) # dec_input???
+    # print("Shape of dense_dec_inputs: ", dense_dec_inputs.shape)
+    
+    p_gen_inputs = tf.keras.layers.Add()([dense_context_vec, dense_dec_lstm, dense_dec_inputs])
+    # print("Shape of p_gen_inputs: ", p_gen_inputs.shape)
 
 
-    # p_gen = (
+    # probability of generating new word vs copying from text
+    p_gen = tf.keras.layers.Dense(1, activation='sigmoid', name='p_gen')(p_gen_inputs)
+
+    # print("Shape of p_gen: ", p_gen.shape)
+    # print("Shape of p_vocab_w: ", p_vocab_w.shape)
+
+    generated_w = tf.keras.layers.Multiply(name='generated_w')([p_gen, p_vocab_w])
+    # print("Shape of generated_w", generated_w.shape)
+
+    enc_input_onehot = tf.keras.layers.Lambda(
+        lambda x: tf.keras.backend.one_hot(x, enc_vocab_size),
+        name="enc_input_onehot"
+    )(enc_input)
+    # print("Shape of enc_input: ", enc_input.shape)
+    # print("Shape of init_text_for_pointer", enc_input_onehot.shape)
+    
+    text_for_pointer = tf.keras.layers.Lambda(
+        lambda local_inputs: tf.matmul(local_inputs[0], local_inputs[1]),
+        name='text_for_pointer'
+    )([att_vector, enc_input_onehot])
+    # print("Shape of text_for_pointer: ", text_for_pointer.shape)
+    
+
+    pointed_w = tf.keras.layers.Multiply(name='pointed_w')([1-p_gen, text_for_pointer])
+    # print("Shape of pointed_w", pointed_w.shape)
+
+    output = tf.keras.layers.Add(name='output')([generated_w, pointed_w])
+
+    # p_gen = sigmoid(
     #     W_h.T*context_vec +                 # Shape of context_vec (None, None, 128)
     #     W_s.T*dec_state_h +                 # Shape of dec_state_h Tensor("decoder_lstm/Identity_1:0", shape=(None, 128), dtype=float32)
     #     W_x.T*dec_embedded_sequence +       # Shape of dec_embedded_sequence Tensor("decoder_embeddings/Identity:0", shape=(None, None, 200), dtype=float32)
@@ -238,7 +276,7 @@ def MainModel(text_max_len=1500,
     #  p_w = p_gen*p_vocab_w + (1-p_gen)*SUM(att_vec)  # Shape of dec_output Tensor("time_distributed_dense/Identity:0", shape=(None, None, 120002), dtype=float32)
 
     # DEFINING MAIN MODEL ------------------------------------------------------------------------------------------------#
-    model = tf.keras.models.Model([enc_input, dec_input], dec_output)
+    model = tf.keras.models.Model([enc_input, dec_input], output)
 
     return model
     
@@ -249,7 +287,7 @@ def EncoderOnly(trained_enc_dec_model):
         outputs=[
             trained_enc_dec_model.get_layer('encoder_bidirectional_lstm').output[0],
             trained_enc_dec_model.get_layer('encoder_hidden_state_avg').output, 
-            trained_enc_dec_model.get_layer('encoder_cell_state_avg').output
+            trained_enc_dec_model.get_layer('encoder_cell_state_avg').output,
         ]
     )
 
@@ -274,10 +312,10 @@ def InferenceDecoder(trained_enc_dec_model,
         shape=(lstm_hidden_units,), 
         name='inf_input_3'
     )
-
     
     # load embedding layer
-    inf_dec_emb = trained_enc_dec_model.get_layer('decoder_embeddings').output
+    emb = trained_enc_dec_model.get_layer('encoder_embeddings')
+    inf_dec_emb = emb(inf_dec_input)
 
     # load weights of decoder lstm layer from trained model
     inf_lstm_layer = trained_enc_dec_model.get_layer('decoder_lstm')    
@@ -289,19 +327,55 @@ def InferenceDecoder(trained_enc_dec_model,
 
     # load weights and configuration of decoder attention layer from trained model
     inf_attention_layer = trained_enc_dec_model.get_layer('bahdanau_attention')
-    inf_context_vec = inf_attention_layer([inf_dec_lstm, inf_decoder_hidden_states_input], training=False)
+    inf_context_vec, inf_att_vector = inf_attention_layer([inf_dec_lstm, inf_decoder_hidden_states_input], training=False)
 
     # Concatenation of context vector with decoder output
     inf_dec_concat = tf.keras.layers.Concatenate()([inf_dec_lstm, inf_context_vec])
 
     # A dense softmax layer to generate prob dist. over the target vocabulary
-    inf_dense_layer = trained_enc_dec_model.get_layer('time_distributed_dense') # time_distributed_dense
-    inf_dec_output = inf_dense_layer(inf_dec_concat)
+    inf_p_vocab_layer = trained_enc_dec_model.get_layer('time_distributed_dense') # time_distributed_dense
+    inf_p_vocab_w = inf_p_vocab_layer(inf_dec_concat)
 
+    # inference point-generator inputs
+    inf_dense_context_layer = trained_enc_dec_model.get_layer("d_con_vec")
+    inf_dense_context_vec = inf_dense_context_layer(inf_context_vec)
+
+    inf_dense_dec_lstm_layer = trained_enc_dec_model.get_layer("d_dec_state_h")
+    inf_dense_dec_lstm = inf_dense_dec_lstm_layer(inf_dec_lstm)
+
+    inf_dense_dec_inputs_layer = trained_enc_dec_model.get_layer("d_dec_inputs")
+    inf_dense_dec_inputs = inf_dense_dec_inputs_layer(inf_dec_emb)
+    
+    inf_p_gen_inputs = tf.keras.layers.Add()([inf_dense_context_vec, inf_dense_dec_lstm, inf_dense_dec_inputs])
+    
+
+    # probability of generating new word vs copying from text
+    inf_p_gen_layer = trained_enc_dec_model.get_layer("p_gen")
+    inf_p_gen = inf_p_gen_layer(inf_p_gen_inputs)
+
+    inf_generated_w_layer = trained_enc_dec_model.get_layer("generated_w")
+    inf_generated_w = inf_generated_w_layer([inf_p_gen, inf_p_vocab_w])
+
+
+    inf_enc_input = tf.keras.layers.Input(
+        shape=(text_max_len, ), 
+        dtype='int32'
+    )
+    inf_enc_input_onehot_layer = trained_enc_dec_model.get_layer("enc_input_onehot")
+    inf_enc_input_onehot = inf_enc_input_onehot_layer(inf_enc_input)
+
+    
+    inf_text_for_pointer_layer = trained_enc_dec_model.get_layer("text_for_pointer")
+    inf_text_for_pointer = inf_text_for_pointer_layer([inf_att_vector, inf_enc_input_onehot])
+
+    inf_pointed_w = tf.keras.layers.Multiply()([1-inf_p_gen, inf_text_for_pointer])
+    inf_output = tf.keras.layers.Add()([inf_generated_w, inf_pointed_w])
+    
+    
     # Final decoder model
     inference_decoder = tf.keras.models.Model(
-        [inf_dec_input] + [inf_decoder_hidden_states_input, inf_decoder_state_input_h, inf_decoder_state_input_c],
-        [inf_dec_output] + [inf_state_h, inf_state_c])
+        [inf_dec_input] + [inf_decoder_hidden_states_input, inf_decoder_state_input_h, inf_decoder_state_input_c] + [inf_enc_input],
+        [inf_output] + [inf_state_h, inf_state_c]) # hmm... so decoder hiddden states won't reflect pointer mechanism...
 
     return inference_decoder
 

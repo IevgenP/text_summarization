@@ -35,20 +35,15 @@ if __name__ == '__main__':
         text_tokenizer = pickle.load(file)
     enc_vocab_size = len(text_tokenizer.word_index) + 1
 
-    with open(ROOT_DIR + '/pickled/trained_summaries_tokenizer', 'rb') as file:
-        summ_tokenizer = pickle.load(file)
-    dec_vocab_size = len(summ_tokenizer.word_index) + 1
-
     print("Shape of text and summaries:", x_train.shape, y_train.shape, x_val.shape, y_val.shape)
     print("Encoder input vocabulary size:", enc_vocab_size)
-    print("Decoder input vocabulary size:", dec_vocab_size)
+    print("Decoder input vocabulary size:", enc_vocab_size)
 
     # initialize the model
     model = MainModel(
         text_max_len=TEXT_LEN,
         summary_max_len=SUMMARY_LEN,
         enc_vocab_size=enc_vocab_size,
-        dec_vocab_size=dec_vocab_size,
         embedded_dimension=EMBEDDING_DIM,
         attention_units=ATT_U,
         dropout=DROPOUT
@@ -80,7 +75,7 @@ if __name__ == '__main__':
     )
 
     # save model
-    model.save(ROOT_DIR + '/pickled/enc_dec_att_avg_2_lstm_all_hl.h5')
+    model.save(ROOT_DIR + '/pickled/enc_dec_att_PointerGenerator.h5')
 
     # plot history for loss and accuracy
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -92,4 +87,4 @@ if __name__ == '__main__':
     ax.set_xlabel('Epoch')
     ax.legend(['train', 'test'], loc='upper left')
 
-    fig.savefig(ROOT_DIR + '/train_val_loss_charts/train_val_loss_avg_2_lstm_all_hl.png')
+    fig.savefig(ROOT_DIR + '/train_val_loss_charts/train_val_loss_enc_dec_att_PointerGenerator.png')

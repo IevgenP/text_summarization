@@ -67,12 +67,13 @@ if __name__ == '__main__':
         clean_text(key, value, start_end_marks=True)
 
 
-    # fit tokenizer on summaries 
-    # this step is required at least because there are samplestart and sampleend tokens in summaries
-    fit_tokenizer(path_to_text_list='/prep_data/train_labels_prep',
-                  vocab_size=VOCAB_SIZE, 
-                  save=True, 
-                  path_to_tokenizer='/pickled/trained_summaries_tokenizer')
+    # # fit tokenizer on summaries 
+    # # this step is required at least because there are samplestart and sampleend tokens in summaries
+    # # skipped for pointer-generator
+    # fit_tokenizer(path_to_text_list='/prep_data/train_labels_prep',
+    #               vocab_size=VOCAB_SIZE, 
+    #               save=True, 
+    #               path_to_tokenizer='/pickled/trained_summaries_tokenizer')
 
 
     # transform texts into matrix of tokens
@@ -83,7 +84,7 @@ if __name__ == '__main__':
     }
 
     for key, value in summary_savepath_len.items():
-        tokenize_and_pad_text(path_to_tokenizer='/pickled/trained_summaries_tokenizer',
+        tokenize_and_pad_text(path_to_tokenizer='/pickled/trained_text_tokenizer',
                               path_to_text_list=key, 
                               path_to_tokenized_text=value[0], 
                               padding_length=value[1])

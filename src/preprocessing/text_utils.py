@@ -33,6 +33,9 @@ def fit_tokenizer(path_to_text_list, vocab_size=20000, save=False, path_to_token
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=vocab_size+2, oov_token='UNK', filters='!"#$%&()*+-/:;<=>?@[\\]^`{|}~\t\n', lower=True) # '!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~\t\n'
     tokenizer.fit_on_texts(train_text)
     tokenizer.word_index = {key:value for key, value in tokenizer.word_index.items() if value < vocab_size+2}
+    # addition required for point-generation approach only
+    tokenizer.word_index['samplestart'] = len(tokenizer.word_index) + 1
+    tokenizer.word_index['sampleend'] = len(tokenizer.word_index) + 1
     tokenizer.index_word = {value:key for key, value in tokenizer.word_index.items()}
 
     if save:

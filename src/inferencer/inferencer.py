@@ -23,7 +23,7 @@ def decode_sequence(input_sequence, encoder, decoder_model, word_index, reverse_
     # loop through decoder untill max length is reached or stop word is predicted
     print('started while loop...')
     while not stop_condition:
-        output_tokens, h, c = decoder_model.predict([target_seq] + [enc_output, input_hidden_state, input_cell_state])
+        output_tokens, h, c = decoder_model.predict([target_seq] + [enc_output, input_hidden_state, input_cell_state] + [input_sequence])
         
         # Sample a token
         sampled_token_index = np.argmax(output_tokens[0, -1, :])

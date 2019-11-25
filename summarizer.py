@@ -6,12 +6,6 @@ from src.nn.encoder_decoder import BahdanauAttention, EncoderOnly, InferenceDeco
 from src.inferencer.inferencer import decode_sequence, sequence_to_summary, sequence_to_text
 
 # load tokenizer for extracting word indices
-with open(ROOT_DIR + '/pickled/trained_summaries_tokenizer', 'rb') as file:
-    summ_tokenizer = pickle.load(file)
-summ_word_index = summ_tokenizer.word_index
-dec_vocab_size = len(summ_word_index) + 1
-rev_summ_word_index = summ_tokenizer.index_word
-
 with open(ROOT_DIR + '/pickled/trained_text_tokenizer', 'rb') as file:
     text_tokenizer = pickle.load(file)
 text_word_index = text_tokenizer.word_index
@@ -34,7 +28,7 @@ with open(ROOT_DIR + '/prep_data/tokenized/train_labels_tokenized', 'rb') as fil
 
 # load pre-trained model
 trained_model = tf.keras.models.load_model(
-    ROOT_DIR + '/pickled/enc_dec_att_avg_2_lstm_all_hl.h5',
+    ROOT_DIR + '/pickled/enc_dec_att_PointerGenerator.h5',
     custom_objects={'BahdanauAttention': BahdanauAttention}
 )
 trained_model.summary()
@@ -54,7 +48,7 @@ inf_dec.summary()
 for i in range(45,50): # len(x_val)
   print("Review:", sequence_to_text(input_sequence=x_val[i], reverse_word_index=rev_text_word_index))
   print("\n")
-  print("Original summary:", sequence_to_summary(input_sequence=y_val[i], reverse_word_index=rev_summ_word_index))
+  print("Original summary:", sequence_to_summary(input_sequence=y_val[i], reverse_word_index=rev_text_word_index))
   print("\n")
   print(
       "Predicted summary:", 
@@ -62,8 +56,8 @@ for i in range(45,50): # len(x_val)
           input_sequence=x_val[i:i+1, :],
           encoder=enc,
           decoder_model=inf_dec,
-          word_index=summ_word_index,
-          reverse_word_index=rev_summ_word_index,
+          word_index=text_word_index,
+          reverse_word_index=rev_text_word_index,
           summary_max_len=SUMMARY_LEN
         )
     )
